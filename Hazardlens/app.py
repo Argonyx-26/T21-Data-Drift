@@ -1,6 +1,6 @@
 """
-Hazardlens - Live Dashboard (Polished UI)
----------------------------------------------
+HazardLens — Live Dashboard
+-------------------------------
 Streamlit app: upload a video file, see PPE and zone violations flagged
 in real time as it plays, and view a running violation log.
 
@@ -8,8 +8,8 @@ HOW TO RUN:
     streamlit run app.py
 
 BEFORE RUNNING:
-    Make sure best.pt (your trained YOLOv8 weights) is in this same
-    folder, or update WEIGHTS_PATH below.
+    Make sure best.pt (custom YOLO weights) and yolov8n.pt (pretrained)
+    are in the same folder, or update the paths below.
 """
 
 import time
@@ -19,13 +19,15 @@ import streamlit as st
 
 from detector import SafeZoneDetector
 
-WEIGHTS_PATH = "best.pt"
+PPE_WEIGHTS    = "best.pt"
+PERSON_WEIGHTS = "yolov8n.pt"
 
-st.set_page_config(page_title="SafeZone AI", page_icon="🦺", layout="wide")
+st.set_page_config(page_title="HazardLens", page_icon="🦺", layout="wide")
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
 # Custom styling
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+
 st.markdown("""
 <style>
     :root {
@@ -80,8 +82,8 @@ st.markdown("""
         animation: pulse 1.5s infinite;
     }
     @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 rgba(34,197,94, 0.6); }
-        70% { box-shadow: 0 0 0 8px rgba(34,197,94, 0); }
+        0%   { box-shadow: 0 0 0 0 rgba(34,197,94, 0.6); }
+        70%  { box-shadow: 0 0 0 8px rgba(34,197,94, 0); }
         100% { box-shadow: 0 0 0 0 rgba(34,197,94, 0); }
     }
 
@@ -102,24 +104,8 @@ st.markdown("""
         font-weight: 700;
         line-height: 1.2;
     }
-    .card-ppe { background: linear-gradient(135deg, #D7263D 0%, #A31621 100%); }
+    .card-ppe  { background: linear-gradient(135deg, #D7263D 0%, #A31621 100%); }
     .card-zone { background: linear-gradient(135deg, #FF9F1C 0%, #E8720C 100%); }
-
-    .badge-ppe {
-        background-color: #FCE4E4; color: #B3261E;
-        padding: 2px 10px; border-radius: 10px; font-weight: 600; font-size: 0.78rem;
-    }
-    .badge-zone {
-        background-color: #FFEACC; color: #B25E00;
-        padding: 2px 10px; border-radius: 10px; font-weight: 600; font-size: 0.78rem;
-    }
-
-    .video-frame {
-        border-radius: 14px;
-        overflow: hidden;
-        border: 3px solid var(--navy);
-        box-shadow: 0 4px 18px rgba(0,0,0,0.12);
-    }
 
     section[data-testid="stSidebar"] {
         background-color: var(--navy);
@@ -130,24 +116,31 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
 # Header
-# ---------------------------------------------------------------------
+# ─────────────────────────────────────────────────────────────
+
 st.markdown("""
 <div class="sz-header">
-    <h1>🦺 SafeZone AI</h1>
+    <h1>🦺 HazardLens</h1>
     <p>Real-time PPE compliance and restricted-zone monitoring</p>
 </div>
 """, unsafe_allow_html=True)
 
-# --- Sidebar controls ---
-st.sidebar.header("⚙️ Controls")
-uploaded_file = st.sidebar.file_uploader("Upload a video", type=["mp4", "mov", "avi"])
-conf_threshold = st.sidebar.slider("Detection confidence", 0.1, 0.9, 0.4, 0.05)
-start_button = st.sidebar.button("▶  Start monitoring", use_container_width=True)
-stop_button = st.sidebar.button("⏹  Stop", use_container_width=True)
+# ─────────────────────────────────────────────────────────────
+# Sidebar controls
+# ─────────────────────────────────────────────────────────────
 
-# --- Session state for violation log ---
+st.sidebar.header("⚙️ Controls")
+uploaded_file  = st.sidebar.file_uploader("Upload a video", type=["mp4", "mov", "avi"])
+conf_threshold = st.sidebar.slider("Detection confidence", 0.1, 0.9, 0.4, 0.05)
+start_button   = st.sidebar.button("▶  Start monitoring", use_container_width=True)
+stop_button    = st.sidebar.button("⏹  Stop", use_container_width=True)
+
+# ─────────────────────────────────────────────────────────────
+# Session state initialisation
+# ─────────────────────────────────────────────────────────────
+
 if "violations" not in st.session_state:
     st.session_state.violations = []
 if "running" not in st.session_state:
@@ -155,10 +148,16 @@ if "running" not in st.session_state:
 
 if start_button:
     st.session_state.running = True
+    # Clear old violations when starting a new monitoring session
+    st.session_state.violations = []
+
 if stop_button:
     st.session_state.running = False
 
-# --- Status badge ---
+# ─────────────────────────────────────────────────────────────
+# Status badge
+# ─────────────────────────────────────────────────────────────
+
 if st.session_state.running:
     st.markdown(
         '<span class="status-badge status-live">'
@@ -173,21 +172,24 @@ else:
 
 st.write("")
 
-# --- Layout: video on the left, metrics + log on the right ---
+# ─────────────────────────────────────────────────────────────
+# Layout: video on the left, metrics + log on the right
+# ─────────────────────────────────────────────────────────────
+
 col_video, col_stats = st.columns([2, 1])
 
 with col_video:
-    st.markdown('<div class="video-frame">', unsafe_allow_html=True)
     video_placeholder = st.empty()
-    st.markdown('</div>', unsafe_allow_html=True)
 
 with col_stats:
-    st.subheader("Live Stats")
+    st.subheader("Live stats")
+
     stat_col1, stat_col2 = st.columns(2)
-    metric_ppe_placeholder = stat_col1.empty()
+    metric_ppe_placeholder  = stat_col1.empty()
     metric_zone_placeholder = stat_col2.empty()
 
-    def render_stat_cards(ppe_count, zone_count):
+    def render_stat_cards(ppe_count: int, zone_count: int):
+        """Render the PPE and zone violation count cards."""
         metric_ppe_placeholder.markdown(f"""
         <div class="stat-card card-ppe">
             <div class="label">🪖 PPE Violations</div>
@@ -203,64 +205,69 @@ with col_stats:
 
     render_stat_cards(0, 0)
 
-    st.subheader("Violation Log")
+    st.subheader("Violation log")
     log_placeholder = st.empty()
 
 
-def render_log(violations):
+def render_log(violations: list):
+    """
+    Render the violation log as a native Streamlit dataframe.
+
+    Uses st.dataframe() instead of raw HTML to avoid rendering
+    issues where HTML tags appear as text.
+    """
     if not violations:
         log_placeholder.info("No violations logged yet.")
         return
-    rows_html = ""
-    for v in violations[::-1][:50]:
-        badge_class = "badge-ppe" if v["Type"] == "PPE" else "badge-zone"
-        rows_html += f"""
-        <tr>
-            <td style="padding:6px 8px; font-weight:600;">{v['Time']}</td>
-            <td style="padding:6px 8px;"><span class="{badge_class}">{v['Type']}</span></td>
-            <td style="padding:6px 8px;">{v['Confidence']}</td>
-            <td style="padding:6px 8px; color:#444;">{v['Details']}</td>
-        </tr>
-        """
-    table_html = f"""
-    <div style="max-height:320px; overflow-y:auto; border-radius:10px; border:1px solid #E5E5EA;">
-    <table style="width:100%; border-collapse:collapse; font-size:0.85rem;">
-        <thead style="background:#F5F5F7; position:sticky; top:0;">
-            <tr>
-                <th style="text-align:left; padding:8px;">Time</th>
-                <th style="text-align:left; padding:8px;">Type</th>
-                <th style="text-align:left; padding:8px;">Conf.</th>
-                <th style="text-align:left; padding:8px;">Details</th>
-            </tr>
-        </thead>
-        <tbody>{rows_html}</tbody>
-    </table>
-    </div>
-    """
-    log_placeholder.markdown(table_html, unsafe_allow_html=True)
+
+    # Show newest violations first, limit to 50
+    display_data = violations[::-1][:50]
+    df = pd.DataFrame(display_data)
+
+    log_placeholder.dataframe(
+        df,
+        hide_index=True,
+        height=320,
+    )
 
 
 render_log(st.session_state.violations)
 
+# ─────────────────────────────────────────────────────────────
+# Main monitoring loop
+# ─────────────────────────────────────────────────────────────
+
 if st.session_state.running:
+
+    # ── Load detector ──────────────────────────────────────────
     try:
-        detector = SafeZoneDetector(weights_path=WEIGHTS_PATH, conf_threshold=conf_threshold)
+        detector = SafeZoneDetector(
+            ppe_weights=PPE_WEIGHTS,
+            person_weights=PERSON_WEIGHTS,
+            conf_threshold=conf_threshold,
+        )
     except Exception as e:
-        st.error(f"Could not load model weights from '{WEIGHTS_PATH}'. "
-                 f"Make sure you've trained the model and copied best.pt here.\n\n{e}")
+        st.error(
+            f"Could not load model weights. Make sure '{PPE_WEIGHTS}' "
+            f"and '{PERSON_WEIGHTS}' are in the project folder.\n\n{e}"
+        )
         st.stop()
 
+    # ── Load video ─────────────────────────────────────────────
     if uploaded_file is None:
         st.warning("Please upload a video file in the sidebar first.")
         st.stop()
+
     temp_path = "temp_uploaded_video.mp4"
     with open(temp_path, "wb") as f:
         f.write(uploaded_file.read())
+
     cap = cv2.VideoCapture(temp_path)
 
-    ppe_count = 0
+    ppe_count  = 0
     zone_count = 0
 
+    # ── Process frames ─────────────────────────────────────────
     while cap.isOpened() and st.session_state.running:
         ret, frame = cap.read()
         if not ret:
@@ -268,18 +275,20 @@ if st.session_state.running:
 
         annotated_frame, violations = detector.process_frame(frame)
 
+        # ── Record new violation events ────────────────────────
         for v in violations:
             st.session_state.violations.append({
-                "Time": time.strftime("%H:%M:%S", time.localtime(v.timestamp)),
-                "Type": v.type,
+                "Time":       time.strftime("%H:%M:%S", time.localtime(v.timestamp)),
+                "Type":       v.type,
                 "Confidence": f"{v.confidence:.2f}",
-                "Details": v.details,
+                "Details":    v.details,
             })
             if v.type == "PPE":
                 ppe_count += 1
             elif v.type == "ZONE":
                 zone_count += 1
 
+        # ── Update display ─────────────────────────────────────
         video_placeholder.image(
             cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB),
             channels="RGB",
@@ -292,5 +301,15 @@ if st.session_state.running:
         time.sleep(0.03)
 
     cap.release()
+
+    # ── End of video ───────────────────────────────────────────
+    if ppe_count == 0 and zone_count == 0:
+        st.info("Video processing complete. No violations detected.")
+    else:
+        st.success(
+            f"Video processing complete. "
+            f"PPE violations: {ppe_count} | Zone intrusions: {zone_count}"
+        )
+
 else:
     video_placeholder.info("Click **Start monitoring** in the sidebar to begin.")
