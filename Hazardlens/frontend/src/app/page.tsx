@@ -2,15 +2,24 @@
 
 import React, { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff } from 'lucide-react';
 import styles from './page.module.css';
 import HazardLensLogo from '@/components/HazardLensLogo';
 import MascotIllustration from '@/components/MascotIllustration';
+import { auth } from '@/lib/firebase';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updateProfile,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from 'firebase/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('officer@hazardlens.ai');
-  const [password, setPassword] = useState('safetyfirst123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -21,6 +30,7 @@ export default function LoginPage() {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
 
   // Sign Up Modal State
   const [showSignUpModal, setShowSignUpModal] = useState(false);
@@ -32,60 +42,69 @@ export default function LoginPage() {
   const [signUpSuccess, setSignUpSuccess] = useState(false);
   const [signUpLoading, setSignUpLoading] = useState(false);
 
+  // ── Firebase error → user-friendly message ──
+  function firebaseErrorMessage(code: string): string {
+    switch (code) {
+      case 'auth/invalid-credential':
+      case 'auth/wrong-password':
+      case 'auth/user-not-found':
+        return 'Invalid email or password.';
+      case 'auth/too-many-requests':
+        return 'Too many attempts. Please try again later.';
+      case 'auth/invalid-email':
+        return 'Please enter a valid email address.';
+      case 'auth/network-request-failed':
+        return 'Network error. Please check your connection.';
+      case 'auth/email-already-in-use':
+        return 'An account with this email already exists.';
+      case 'auth/weak-password':
+        return 'Password is too weak. Use at least 6 characters.';
+      default:
+        return 'Something went wrong. Please try again.';
+    }
+  }
+
+  // ── Login ──
   const submitLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
-      });
+      // Set persistence based on "Remember me" BEFORE signing in.
+      await setPersistence(
+        auth,
+        rememberMe ? browserLocalPersistence : browserSessionPersistence
+      );
 
-      if (res.ok) {
-        const data = await res.json();
-        localStorage.setItem('hazardlens_token', data.token);
-        localStorage.setItem('hazardlens_user', JSON.stringify(data.user));
-        router.push('/dashboard');
-        return;
-      }
-
-      const errData = await res.json().catch(() => null);
-      throw new Error(errData?.detail || 'Invalid email or password.');
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push('/dashboard');
     } catch (err: any) {
-      if (err.message && !err.message.includes('fetch')) {
-        setError(err.message);
-      } else {
-        // Fallback for demo when backend is offline
-        localStorage.setItem('hazardlens_token', 'demo-token-fallback');
-        localStorage.setItem(
-          'hazardlens_user',
-          JSON.stringify({
-            name: 'Safety Officer',
-            email,
-            role: 'admin',
-          })
-        );
-        router.push('/dashboard');
-      }
+      setError(firebaseErrorMessage(err?.code || ''));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleForgotSubmit = (e: FormEvent) => {
+  // ── Forgot Password ──
+  const handleForgotSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!forgotEmail) return;
     setForgotLoading(true);
-    setTimeout(() => {
-      setForgotLoading(false);
+    setForgotError('');
+
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail);
       setForgotSent(true);
-    }, 600);
+    } catch (err: any) {
+      setForgotError(firebaseErrorMessage(err?.code || ''));
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
-  const handleSignUpSubmit = (e: FormEvent) => {
+  // ── Sign Up ──
+  const handleSignUpSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSignUpError('');
 
@@ -105,10 +124,23 @@ export default function LoginPage() {
     }
 
     setSignUpLoading(true);
-    setTimeout(() => {
-      setSignUpLoading(false);
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        signUpEmail,
+        signUpPassword
+      );
+      // Attach display name to the newly created user
+      await updateProfile(userCredential.user, { displayName: signUpName });
+      // Sign out so they use the login form (optional UX choice)
+      await auth.signOut();
       setSignUpSuccess(true);
-    }, 700);
+    } catch (err: any) {
+      setSignUpError(firebaseErrorMessage(err?.code || ''));
+    } finally {
+      setSignUpLoading(false);
+    }
   };
 
   return (
@@ -142,11 +174,13 @@ export default function LoginPage() {
                 </svg>
               </span>
               <input
+                id="login-email"
                 type="email"
                 className={styles.inputField}
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="email"
                 required
               />
             </div>
@@ -159,20 +193,33 @@ export default function LoginPage() {
                 </svg>
               </span>
               <input
+                id="login-password"
                 type={showPassword ? 'text' : 'password'}
                 className={styles.inputField}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 required
               />
               <button
                 type="button"
                 className={styles.eyeToggleBtn}
                 onClick={() => setShowPassword(!showPassword)}
-                title={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                    <circle cx="12" cy="12" r="3" />
+                  </svg>
+                )}
               </button>
             </div>
 
@@ -192,6 +239,7 @@ export default function LoginPage() {
                 onClick={() => {
                   setForgotEmail(email);
                   setForgotSent(false);
+                  setForgotError('');
                   setShowForgotModal(true);
                 }}
               >
@@ -220,7 +268,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Right Section: Mascot & Improved AI Value Card */}
+        {/* Right Section: Mascot & AI Value Card */}
         <div className={styles.rightSection}>
           <div className={styles.mascotGlow} />
 
@@ -230,7 +278,7 @@ export default function LoginPage() {
             speechText="Site safety inspection active!"
           />
 
-          {/* Improved Product Value Card */}
+          {/* Product Value Card */}
           <div className={styles.aiFeatureCard}>
             <div className={styles.aiCardHeader}>
               <div>
@@ -253,14 +301,14 @@ export default function LoginPage() {
               </div>
               <div className={styles.aiFeatureItem}>
                 <span className={styles.aiBulletIcon}>⚡</span>
-                <span>Real-Time Safety Analysis & Event Logging</span>
+                <span>Real-Time Safety Analysis &amp; Event Logging</span>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Forgot Password Modal */}
+      {/* ─── Forgot Password Modal ─── */}
       {showForgotModal && (
         <div
           className={styles.modalBackdrop}
@@ -298,6 +346,8 @@ export default function LoginPage() {
               </div>
             ) : (
               <form onSubmit={handleForgotSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {forgotError && <div className={styles.errorBanner}>{forgotError}</div>}
+
                 <div className={styles.inputGroup}>
                   <span className={styles.inputIcon}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -344,7 +394,7 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Sign Up Modal */}
+      {/* ─── Sign Up Modal ─── */}
       {showSignUpModal && (
         <div
           className={styles.modalBackdrop}

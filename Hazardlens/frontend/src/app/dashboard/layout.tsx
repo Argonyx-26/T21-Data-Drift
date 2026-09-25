@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import styles from './layout.module.css';
 import HazardLensLogo from '@/components/HazardLensLogo';
+import { auth } from '@/lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 // Navigation without Incidents
 const navItems = [
@@ -82,22 +84,37 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [userName, setUserName] = useState('Safety Officer');
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    const user = localStorage.getItem('hazardlens_user');
-    if (user) {
-      try {
-        const parsed = JSON.parse(user);
-        setUserName(parsed.name || 'Safety Officer');
-      } catch {}
-    }
-  }, []);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // Not logged in → redirect to login page
+        router.replace('/');
+        return;
+      }
+      setUserName(user.displayName || user.email || 'Safety Officer');
+      setAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
-  const handleLogout = () => {
-    localStorage.removeItem('hazardlens_token');
-    localStorage.removeItem('hazardlens_user');
+  const handleLogout = async () => {
+    await signOut(auth);
     router.push('/');
   };
+
+  // Don't render dashboard until Firebase confirms auth
+  if (!authReady) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--bg-page)' }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ width: 40, height: 40, border: '4px solid #E5E7EB', borderTopColor: '#F5A623', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ color: '#6B7280', fontSize: '0.9rem' }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.dashboardContainer}>
