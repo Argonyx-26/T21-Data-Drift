@@ -1,0 +1,18 @@
+<svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="hlShield" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5A623"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <linearGradient id="hlCrest" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#FFF2D6"/>
+    </linearGradient>
+  </defs>
+  <path d="M22 2L39 8V21C39 31.5 22 41 22 41C22 41 5 31.5 5 21V8L22 2Z" fill="url(#hlShield)"/>
+  <path d="M22 5.5L36 10.5V20.5C36 29 22 37.5 22 37.5C22 37.5 8 29 8 20.5V10.5L22 5.5Z" fill="#181926"/>
+  <ellipse cx="22" cy="24" rx="10.5" ry="3.2" fill="url(#hlShield)"/>
+  <path d="M13.5 23.5C13.5 15.5 30.5 15.5 30.5 23.5Z" fill="url(#hlShield)"/>
+  <path d="M21 16L23 16L23.5 23.5L20.5 23.5Z" fill="url(#hlCrest)" opacity="0.9"/>
+  <circle cx="22" cy="20" r="1.8" fill="#181926"/>
+</svg>

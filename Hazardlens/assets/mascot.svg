@@ -1,0 +1,87 @@
+<svg width="200" height="240" viewBox="0 0 200 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="skin" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDDFBA" />
+      <stop offset="100%" stop-color="#F5B285" />
+    </linearGradient>
+    <linearGradient id="hardhat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFDE59" />
+      <stop offset="60%" stop-color="#F5A623" />
+      <stop offset="100%" stop-color="#D98200" />
+    </linearGradient>
+    <linearGradient id="vest" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF7A33" />
+      <stop offset="100%" stop-color="#E24A00" />
+    </linearGradient>
+    <linearGradient id="vestStripe" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#E6FF55" />
+      <stop offset="100%" stop-color="#9CDE00" />
+    </linearGradient>
+    <linearGradient id="suit" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2E334D" />
+      <stop offset="100%" stop-color="#1B1E30" />
+    </linearGradient>
+    <linearGradient id="tabletGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#303545" />
+      <stop offset="100%" stop-color="#12131A" />
+    </linearGradient>
+  </defs>
+
+  <!-- Mascot Body & Shoulders -->
+  <path d="M40 180 C40 150, 60 142, 100 142 C140 142, 160 150, 160 180 L165 240 L35 240 Z" fill="url(#suit)" />
+
+  <!-- Safety Vest -->
+  <path d="M55 146 L78 240 L122 240 L145 146 C132 142, 115 140, 100 140 C85 140, 68 142, 55 146 Z" fill="url(#vest)" />
+
+  <!-- Vest Reflective Stripes -->
+  <line x1="68" y1="150" x2="84" y2="240" stroke="url(#vestStripe)" stroke-width="8" stroke-linecap="round" />
+  <line x1="132" y1="150" x2="116" y2="240" stroke="url(#vestStripe)" stroke-width="8" stroke-linecap="round" />
+  <line x1="60" y1="195" x2="140" y2="195" stroke="url(#vestStripe)" stroke-width="7" />
+
+  <!-- Head / Neck -->
+  <rect x="88" y="118" width="24" height="24" rx="6" fill="#F0A678" />
+  <path d="M65 92 C65 60, 135 60, 135 92 C135 124, 65 124, 65 92 Z" fill="url(#skin)" />
+
+  <!-- Ears -->
+  <circle cx="64" cy="94" r="7" fill="#F5B285" />
+  <circle cx="136" cy="94" r="7" fill="#F5B285" />
+
+  <!-- Hair bangs -->
+  <path d="M72 74 Q100 68 128 74 Q120 86 100 82 Q80 88 72 74 Z" fill="#2C1D11" />
+
+  <!-- Friendly Eyes -->
+  <ellipse cx="84" cy="92" rx="4.5" ry="6" fill="#181926" />
+  <circle cx="85.5" cy="90" r="1.8" fill="#FFFFFF" />
+  <ellipse cx="116" cy="92" rx="4.5" ry="6" fill="#181926" />
+  <circle cx="117.5" cy="90" r="1.8" fill="#FFFFFF" />
+
+  <!-- Eyebrows -->
+  <path d="M78 82 Q84 79 91 82" stroke="#2C1D11" stroke-width="2.5" stroke-linecap="round" fill="none" />
+  <path d="M109 82 Q116 79 122 82" stroke="#2C1D11" stroke-width="2.5" stroke-linecap="round" fill="none" />
+
+  <!-- Cheerful Smile -->
+  <path d="M92 104 Q100 112 108 104" stroke="#8A3B14" stroke-width="2.5" stroke-linecap="round" fill="none" />
+  <!-- Rosy cheeks -->
+  <ellipse cx="76" cy="99" rx="5" ry="3" fill="#FF8D85" opacity="0.4" />
+  <ellipse cx="124" cy="99" rx="5" ry="3" fill="#FF8D85" opacity="0.4" />
+
+  <!-- Yellow Hardhat -->
+  <ellipse cx="100" cy="62" rx="46" ry="10" fill="url(#hardhat)" />
+  <path d="M58 60 C58 24, 142 24, 142 60 C142 63, 58 63, 58 60 Z" fill="url(#hardhat)" />
+  <!-- Hardhat Ridge -->
+  <path d="M96 24 C96 22, 104 22, 104 24 L104 60 L96 60 Z" fill="#FFEDB0" opacity="0.6" />
+  <!-- Hardhat front safety logo badge -->
+  <circle cx="100" cy="46" r="6" fill="#FFFFFF" />
+  <polygon points="100,42 103,48 97,48" fill="#F5A623" />
+
+  <!-- Tablet in hands -->
+  <g>
+    <rect x="74" y="160" width="52" height="42" rx="5" fill="url(#tabletGrad)" stroke="#50566A" stroke-width="2" />
+    <rect x="79" y="165" width="42" height="30" rx="3" fill="#0EA5E9" opacity="0.8" />
+    <!-- Tablet graph screen -->
+    <polyline points="83,188 90,178 98,183 108,172 116,184" fill="none" stroke="#FFFFFF" stroke-width="2" />
+    <!-- Hands -->
+    <circle cx="72" cy="180" r="7" fill="url(#skin)" />
+    <circle cx="128" cy="180" r="7" fill="url(#skin)" />
+  </g>
+</svg>

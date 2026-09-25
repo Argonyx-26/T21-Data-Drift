@@ -6,6 +6,7 @@ Features:
   • Fixed top clearance (padding-top: 3.5rem) preventing header chopping
   • Clean single file uploader (zero duplicate labels/buttons)
   • Compact desktop sidebar (270px)
+  • Dynamic zone selection from ZONE_PRESETS
   • HazardLens construction helmet/shield logo
   • Pixel-aligned compact header with live status pill
   • Perfectly matched vertical alignment between video viewport and statistics
@@ -19,11 +20,18 @@ import os
 import time
 import shutil
 import base64
+import importlib
 import cv2
 import pandas as pd
 import streamlit as st
 
+import detector
+import zone_utils
+importlib.reload(detector)
+importlib.reload(zone_utils)
+
 from detector import SafeZoneDetector
+from zone_utils import ZONE_PRESETS
 
 PPE_WEIGHTS    = "best.pt"
 PERSON_WEIGHTS = "yolov8n.pt"
@@ -72,319 +80,319 @@ logo_b64 = get_base64_image(LOGO_PATH)
 st.markdown("""<style>
 /* Base Theme */
 .stApp {
-background-color: #FFFDF6 !important;
-font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-color: #1A1A2E;
+    background-color: #FFFDF6 !important;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    color: #1A1A2E;
 }
 
 /* Proper Top Clearance for Streamlit Header Toolbar (fixes chopped header) */
 .block-container {
-padding-top: 3.5rem !important;
-padding-bottom: 1.5rem !important;
-padding-left: 1.5rem !important;
-padding-right: 1.5rem !important;
-max-width: 100% !important;
+    padding-top: 3.5rem !important;
+    padding-bottom: 1.5rem !important;
+    padding-left: 1.5rem !important;
+    padding-right: 1.5rem !important;
+    max-width: 100% !important;
 }
 
 /* Column Top Reset for Pixel-Perfect Vertical Alignment */
 [data-testid="column"] > div {
-padding-top: 0 !important;
-margin-top: 0 !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
 }
 
 /* Responsive Desktop Sidebar */
 @media (min-width: 992px) {
-[data-testid="stSidebar"] {
-min-width: 260px !important;
-max-width: 275px !important;
-width: 270px !important;
+    [data-testid="stSidebar"] {
+        min-width: 260px !important;
+        max-width: 275px !important;
+        width: 270px !important;
+    }
 }
-}
 [data-testid="stSidebar"] {
-background-color: #1A1A2E !important;
-border-right: 1px solid rgba(255,255,255,0.08);
+    background-color: #1A1A2E !important;
+    border-right: 1px solid rgba(255,255,255,0.08);
 }
 [data-testid="stSidebar"] * {
-color: #D1D5DB !important;
-font-family: 'Plus Jakarta Sans', sans-serif;
+    color: #D1D5DB !important;
+    font-family: 'Plus Jakarta Sans', sans-serif;
 }
 [data-testid="stSidebar"] .block-container {
-padding: 1.2rem 1rem !important;
-padding-top: 3.5rem !important;
+    padding: 1.2rem 1rem !important;
+    padding-top: 3.5rem !important;
 }
 
 /* Sidebar Branding */
 .sb-brand {
-font-family: 'Outfit', sans-serif;
-font-size: 1.25rem;
-font-weight: 800;
-color: #FFFFFF !important;
-padding-bottom: 0.5rem;
-margin-bottom: 0.8rem;
-border-bottom: 1px solid rgba(255,255,255,0.1);
-line-height: 1;
-display: flex;
-align-items: center;
-gap: 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #FFFFFF !important;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.8rem;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 .sb-brand span {
-color: #F5A623 !important;
+    color: #F5A623 !important;
 }
 .sb-logo {
-width: 28px;
-height: 28px;
-object-fit: contain;
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
 }
 
 /* Sidebar Buttons */
 [data-testid="stSidebar"] .stButton > button {
-border-radius: 8px !important;
-font-weight: 700 !important;
-font-family: 'Outfit', sans-serif !important;
-font-size: 0.88rem !important;
-padding: 0.55rem 1rem !important;
+    border-radius: 8px !important;
+    font-weight: 700 !important;
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 0.88rem !important;
+    padding: 0.55rem 1rem !important;
 }
 [data-testid="stSidebar"] [data-testid="baseButton-primary"],
 [data-testid="stSidebar"] button[kind="primary"] {
-background: linear-gradient(135deg, #F5A623 0%, #D97706 100%) !important;
-color: #1A1A2E !important;
-border: none !important;
-box-shadow: 0 2px 10px rgba(245, 166, 35, 0.3) !important;
+    background: linear-gradient(135deg, #F5A623 0%, #D97706 100%) !important;
+    color: #1A1A2E !important;
+    border: none !important;
+    box-shadow: 0 2px 10px rgba(245, 166, 35, 0.3) !important;
 }
 [data-testid="stSidebar"] [data-testid="baseButton-secondary"],
 [data-testid="stSidebar"] button[kind="secondary"] {
-background: rgba(255,255,255,0.08) !important;
-color: #FFFFFF !important;
-border: 1px solid rgba(255,255,255,0.15) !important;
+    background: rgba(255,255,255,0.08) !important;
+    color: #FFFFFF !important;
+    border: 1px solid rgba(255,255,255,0.15) !important;
 }
 
 /* Main Dashboard Header */
 .hz-header {
-background-color: #1A1A2E;
-border-left: 5px solid #F5A623;
-border-radius: 10px;
-padding: 12px 18px;
-margin-bottom: 14px;
-box-shadow: 0 4px 16px -4px rgba(26, 26, 46, 0.12);
-display: flex;
-align-items: center;
-justify-content: space-between;
+    background-color: #1A1A2E;
+    border-left: 5px solid #F5A623;
+    border-radius: 10px;
+    padding: 12px 18px;
+    margin-bottom: 14px;
+    box-shadow: 0 4px 16px -4px rgba(26, 26, 46, 0.12);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 .hz-header-left {
-display: flex;
-align-items: center;
-gap: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 .hz-logo {
-width: 36px;
-height: 36px;
-object-fit: contain;
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
 }
 .hz-header-text {
-display: flex;
-flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }
 .hz-title {
-color: #FFFFFF;
-font-family: 'Outfit', sans-serif;
-font-size: 1.35rem;
-font-weight: 800;
-line-height: 1.2;
+    color: #FFFFFF;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 800;
+    line-height: 1.2;
 }
 .hz-title .hz-accent {
-color: #F5A623;
+    color: #F5A623;
 }
 .hz-subtitle {
-color: #9CA3AF;
-font-size: 0.8rem;
-font-family: 'Plus Jakarta Sans', sans-serif;
-margin-top: 1px;
+    color: #9CA3AF;
+    font-size: 0.8rem;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    margin-top: 1px;
 }
 
 /* Status Pill */
 .status-pill {
-display: inline-flex;
-align-items: center;
-gap: 7px;
-padding: 4px 12px;
-border-radius: 20px;
-font-family: 'Outfit', sans-serif;
-font-size: 0.74rem;
-font-weight: 700;
-letter-spacing: 0.04em;
-text-transform: uppercase;
-white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.74rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
 }
 .status-pill.active {
-background-color: #ECFDF5;
-color: #065F46;
-border: 1px solid #A7F3D0;
+    background-color: #ECFDF5;
+    color: #065F46;
+    border: 1px solid #A7F3D0;
 }
 .status-pill.inactive {
-background-color: #F3F4F6;
-color: #6B7280;
-border: 1px solid #E5E7EB;
+    background-color: #F3F4F6;
+    color: #6B7280;
+    border: 1px solid #E5E7EB;
 }
 .pulse-dot {
-width: 7px;
-height: 7px;
-border-radius: 50%;
-background-color: #10B981;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #10B981;
 }
 
 /* Panel Headings: Equal Height for Pixel-Perfect Column Alignment */
 .panel-heading {
-font-family: 'Outfit', sans-serif;
-font-size: 0.95rem;
-font-weight: 700;
-color: #1A1A2E;
-margin: 0 0 8px 0 !important;
-padding: 0 !important;
-height: 28px;
-line-height: 28px;
-display: flex;
-align-items: center;
-gap: 7px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1A1A2E;
+    margin: 0 0 8px 0 !important;
+    padding: 0 !important;
+    height: 28px;
+    line-height: 28px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
 }
 
 /* Responsive Video Container */
 .video-viewport {
-background: #0E0F17;
-border-radius: 10px;
-border: 1px solid #E8E2D2;
-overflow: hidden;
-width: 100%;
-display: flex;
-justify-content: center;
-align-items: center;
+    background: #0E0F17;
+    border-radius: 10px;
+    border: 1px solid #E8E2D2;
+    overflow: hidden;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 .video-viewport [data-testid="stImage"] img {
-border-radius: 6px;
-display: block;
-width: 100% !important;
-object-fit: contain;
+    border-radius: 6px;
+    display: block;
+    width: 100% !important;
+    object-fit: contain;
 }
 
 /* Video Empty State */
 .video-empty-box {
-background: #FFFFFF;
-border: 1.5px dashed #E2DCB8;
-border-radius: 10px;
-padding: 2.8rem 1.5rem;
-text-align: center;
-color: #6B7280;
-width: 100%;
+    background: #FFFFFF;
+    border: 1.5px dashed #E2DCB8;
+    border-radius: 10px;
+    padding: 2.8rem 1.5rem;
+    text-align: center;
+    color: #6B7280;
+    width: 100%;
 }
 .ve-icon {
-font-size: 2.5rem;
-display: block;
-margin-bottom: 0.4rem;
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 0.4rem;
 }
 .ve-title {
-font-family: 'Outfit', sans-serif;
-font-size: 1.05rem;
-font-weight: 700;
-color: #1A1A2E;
-margin-bottom: 0.2rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1A1A2E;
+    margin-bottom: 0.2rem;
 }
 .ve-sub {
-font-size: 0.82rem;
-color: #6B7280;
+    font-size: 0.82rem;
+    color: #6B7280;
 }
 
 /* Statistics Grid: Dynamic Responsive Equal Width & Height */
 .stats-grid {
-display: grid;
-grid-template-columns: 1fr 1fr;
-gap: 10px;
-width: 100%;
-margin-bottom: 0;
-align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    width: 100%;
+    margin-bottom: 0;
+    align-items: stretch;
 }
 .stat-card {
-border-radius: 8px;
-padding: 12px 14px;
-box-sizing: border-box;
-width: 100%;
-min-height: 76px;
-display: flex;
-flex-direction: column;
-justify-content: center;
-color: #FFFFFF;
-box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+    border-radius: 8px;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 76px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: #FFFFFF;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
 }
 .stat-ppe {
-background: #C5283D;
+    background: #C5283D;
 }
 .stat-zone {
-background: #E8720C;
+    background: #E8720C;
 }
 .sc-label {
-font-family: 'Outfit', sans-serif;
-font-size: 0.72rem;
-font-weight: 700;
-letter-spacing: 0.04em;
-text-transform: uppercase;
-color: #FFFFFF;
-margin-bottom: 3px;
-white-space: nowrap;
-overflow: hidden;
-text-overflow: ellipsis;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #FFFFFF;
+    margin-bottom: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 .sc-value {
-font-family: 'Outfit', sans-serif;
-font-size: 1.9rem;
-font-weight: 800;
-line-height: 1;
-color: #FFFFFF;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #FFFFFF;
 }
 
 /* Exact Reference Avatar Frame (Column 2) */
 [data-testid="column"]:nth-of-type(2) [data-testid="stImage"] {
-background: #FFFFFF;
-border: 1px solid #E8E2D2;
-border-radius: 8px;
-padding: 6px;
-overflow: hidden;
-display: flex;
-justify-content: center;
-align-items: center;
-box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    background: #FFFFFF;
+    border: 1px solid #E8E2D2;
+    border-radius: 8px;
+    padding: 6px;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
 }
 [data-testid="column"]:nth-of-type(2) [data-testid="stImage"] img {
-border-radius: 6px;
-max-height: 220px;
-width: 100% !important;
-object-fit: contain;
+    border-radius: 6px;
+    max-height: 220px;
+    width: 100% !important;
+    object-fit: contain;
 }
 
 /* Violation Log */
 .log-empty-box {
-background: #FFFFFF;
-border: 1px solid #E8E2D2;
-border-radius: 8px;
-padding: 1rem;
-text-align: center;
-color: #6B7280;
-font-size: 0.82rem;
+    background: #FFFFFF;
+    border: 1px solid #E8E2D2;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    color: #6B7280;
+    font-size: 0.82rem;
 }
 .stDataFrame {
-border-radius: 8px !important;
-overflow: hidden !important;
-border: 1px solid #E5E0D0 !important;
-background: #FFFFFF !important;
-width: 100% !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    border: 1px solid #E5E0D0 !important;
+    background: #FFFFFF !important;
+    width: 100% !important;
 }
 
 /* Responsive columns gap */
 [data-testid="stHorizontalBlock"] {
-gap: 1.2rem !important;
+    gap: 1.2rem !important;
 }
 
 @media (max-width: 1024px) {
-.stats-grid {
-grid-template-columns: 1fr;
-}
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
 }
 </style>""", unsafe_allow_html=True)
 
@@ -440,10 +448,12 @@ with st.sidebar:
     )
 
     # 3. Restricted Zone Area
-    zone_option = st.selectbox(
+    zone_preset_name = st.selectbox(
         "🚧 Restricted Zone Area",
-        ["Active Work Site (Default)"],
+        list(ZONE_PRESETS.keys()),
+        index=0,
     )
+    selected_zone = ZONE_PRESETS.get(zone_preset_name, list(ZONE_PRESETS.values())[0])
 
     # 4. Monitoring Controls
     st.markdown('<div style="margin-top: 0.6rem;"></div>', unsafe_allow_html=True)
@@ -540,7 +550,17 @@ render_log(st.session_state.violations)
 
 if st.session_state.running:
 
-    if uploaded_file is None:
+    # ── Load / Resolve video source ──────────────────────────────
+    if uploaded_file is not None:
+        temp_path = "temp_uploaded_video.mp4"
+        uploaded_file.seek(0)
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.read())
+    elif os.path.exists("temp_uploaded_video.mp4"):
+        temp_path = "temp_uploaded_video.mp4"
+    elif os.path.exists("demo.mp4"):
+        temp_path = "demo.mp4"
+    else:
         st.warning("Please upload a video file in the sidebar to begin monitoring.")
         st.session_state.running = False
         st.stop()
@@ -550,15 +570,14 @@ if st.session_state.running:
             ppe_weights=PPE_WEIGHTS,
             person_weights=PERSON_WEIGHTS,
             conf_threshold=conf_threshold,
+            zone_coords=selected_zone,
         )
     except Exception as e:
-        st.error(f"Could not load detector models ({PPE_WEIGHTS}, {PERSON_WEIGHTS}): {e}")
+        st.error(
+            f"Could not load detector models ({PPE_WEIGHTS}, {PERSON_WEIGHTS}):\n\n{e}"
+        )
         st.session_state.running = False
         st.stop()
-
-    temp_path = "temp_uploaded_video.mp4"
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.read())
 
     cap = cv2.VideoCapture(temp_path)
 
@@ -582,7 +601,10 @@ if st.session_state.running:
                 "Confidence": f"{v.confidence:.2f}",
                 "Details": v.details,
             })
-            if v.type == "PPE":
+            if v.type == "INTRUSION":
+                zone_count += 1
+                ppe_count += 1
+            elif v.type == "PPE":
                 ppe_count += 1
             elif v.type == "ZONE":
                 zone_count += 1
