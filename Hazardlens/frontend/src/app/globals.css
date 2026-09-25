@@ -1,95 +1,103 @@
 /* ============================================================
    HazardLens — Global Design System
-   Premium safety monitoring dashboard
+   Visual Style: Warm Golden/Cream & Charcoal Industrial Safety
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
 
-/* ---- CSS Variables / Design Tokens ---- */
 :root {
-  /* Primary palette */
+  /* Brand Warm Golden/Safety Theme */
   --primary: #F5A623;
-  --primary-light: #FFD479;
-  --primary-dark: #D4891A;
-  --primary-bg: #FFF8EC;
+  --primary-hover: #E59512;
+  --primary-light: #FDE8BD;
+  --primary-subtle: #FFF8EB;
+  --primary-glow: rgba(245, 166, 35, 0.28);
 
-  /* Accent / Safety colors */
-  --accent-orange: #FF6B35;
-  --accent-red: #E74C3C;
-  --accent-green: #27AE60;
-  --accent-blue: #3498DB;
-
-  /* Severity */
-  --severity-critical: #DC2626;
-  --severity-critical-bg: #FEE2E2;
-  --severity-high: #F59E0B;
-  --severity-high-bg: #FEF3C7;
-  --severity-medium: #3B82F6;
-  --severity-medium-bg: #DBEAFE;
-  --severity-low: #10B981;
-  --severity-low-bg: #D1FAE5;
-
-  /* Neutrals */
-  --navy: #1A1A2E;
-  --navy-light: #22223A;
-  --navy-lighter: #2D2D48;
-  --text-primary: #1A1A2E;
-  --text-secondary: #6B7280;
-  --text-muted: #9CA3AF;
-  --border: #E5E7EB;
-  --border-light: #F3F4F6;
-
-  /* Backgrounds */
-  --bg-page: #F5F5F7;
+  /* Page Backgrounds */
+  --bg-page: #FBF8EE;
   --bg-card: #FFFFFF;
-  --bg-sidebar: #1A1A2E;
-  --bg-input: #F9FAFB;
+  --bg-card-subtle: #F7F4EA;
+  --bg-input: #F4F1E6;
+  --bg-hover: #F2EFE4;
+
+  /* Sidebar Dark Charcoal */
+  --sidebar-bg: #181926;
+  --sidebar-surface: #222334;
+  --sidebar-active: #F5A623;
+  --sidebar-text: #9698A6;
+  --sidebar-text-active: #181926;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  /* Stat Category Colors */
+  --stat-blue: #2563EB;
+  --stat-blue-bg: #EFF6FF;
+  --stat-red: #EF4444;
+  --stat-red-bg: #FEF2F2;
+  --stat-amber: #F59E0B;
+  --stat-amber-bg: #FFFBEB;
+  --stat-green: #10B981;
+  --stat-green-bg: #ECFDF5;
+
+  /* Severities */
+  --severity-critical-text: #B91C1C;
+  --severity-critical-bg: #FEE2E2;
+  --severity-critical-border: #FCA5A5;
+
+  --severity-high-text: #C2410C;
+  --severity-high-bg: #FFEDD5;
+  --severity-high-border: #FDBA74;
+
+  --severity-medium-text: #B45309;
+  --severity-medium-bg: #FEF3C7;
+  --severity-medium-border: #FCD34D;
+
+  --severity-low-text: #047857;
+  --severity-low-bg: #D1FAE5;
+  --severity-low-border: #6EE7B7;
+
+  /* Text & Border */
+  --text-main: #181926;
+  --text-muted: #6B7280;
+  --text-light: #9CA3AF;
+  --border-card: #EFE9DA;
+  --border-subtle: #E8E2D2;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-  --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --shadow-xl: 0 20px 50px -12px rgba(0, 0, 0, 0.15);
-  --shadow-glow: 0 0 20px rgba(245, 166, 35, 0.25);
+  --shadow-card: 0 4px 20px -2px rgba(24, 25, 38, 0.05), 0 2px 6px -1px rgba(24, 25, 38, 0.03);
+  --shadow-hover: 0 10px 30px -4px rgba(24, 25, 38, 0.1), 0 4px 10px -2px rgba(24, 25, 38, 0.04);
+  --shadow-float: 0 20px 40px -8px rgba(245, 166, 35, 0.25);
 
-  /* Radii */
+  /* Radius */
   --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
   --radius-full: 9999px;
 
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  /* Typography */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-heading: 'Outfit', 'Inter', sans-serif;
+  /* Fonts */
+  --font-main: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-heading: 'Outfit', 'Plus Jakarta Sans', sans-serif;
 }
 
-/* ---- Reset ---- */
-*,
-*::before,
-*::after {
+*, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html {
-  font-size: 16px;
+html, body {
+  background-color: var(--bg-page);
+  color: var(--text-main);
+  font-family: var(--font-main);
+  min-height: 100vh;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-page);
-  color: var(--text-primary);
-  line-height: 1.6;
-  min-height: 100vh;
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  color: var(--text-main);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 a {
@@ -97,130 +105,45 @@ a {
   text-decoration: none;
 }
 
-img {
-  max-width: 100%;
-  height: auto;
-}
-
 button {
   cursor: pointer;
   font-family: inherit;
   border: none;
+  outline: none;
   background: none;
 }
 
-input, select, textarea {
-  font-family: inherit;
-  font-size: inherit;
-}
-
-/* ---- Utility Classes ---- */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* ---- Scrollbar Styling ---- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--text-muted);
-  border-radius: var(--radius-full);
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
-}
-
-/* ---- Animations ---- */
+/* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes fadeInScale {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideInRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideInLeft {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@keyframes pulseGlow {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.04); opacity: 1; }
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+.fade-in {
+  animation: fadeIn 0.35s ease-out forwards;
 }
 
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-
-.animate-fade-in {
-  animation: fadeIn 0.4s var(--transition-base) forwards;
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.animate-slide-up {
-  animation: slideUp 0.5s var(--transition-base) forwards;
+::-webkit-scrollbar-thumb {
+  background: #D9D2BF;
+  border-radius: 9999px;
 }
-
-/* Stagger children animations */
-.stagger-children > * {
-  opacity: 0;
-  animation: fadeIn 0.4s ease forwards;
-}
-
-.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
-.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
-.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
-.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
-.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
-.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
-
-/* ---- Loading skeleton ---- */
-.skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--border-light) 25%,
-    var(--border) 50%,
-    var(--border-light) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: var(--radius-sm);
+::-webkit-scrollbar-thumb:hover {
+  background: #B8B09A;
 }

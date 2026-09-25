@@ -1,0 +1,139 @@
+.settingsWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  max-width: 900px;
+}
+
+.headerSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: #181926;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 0.92rem;
+  color: #6B7280;
+  margin-top: 3px;
+}
+
+.card {
+  background: #FFFFFF;
+  border-radius: 20px;
+  border: 1px solid #ECE7D9;
+  box-shadow: 0 4px 20px -2px rgba(24, 25, 38, 0.04);
+  padding: 1.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.cardTitle {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #181926;
+  border-bottom: 1px solid #F0ECE0;
+  padding-bottom: 0.8rem;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.2rem;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.input {
+  padding: 11px 14px;
+  border: 1.5px solid #E5E7EB;
+  border-radius: 12px;
+  font-size: 0.88rem;
+  color: #181926;
+  outline: none;
+  background: #FAF7EE;
+  transition: all 0.15s ease;
+}
+
+.input:focus {
+  border-color: #F5A623;
+  background: #FFFFFF;
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rangeInput {
+  flex: 1;
+  accent-color: #F5A623;
+  cursor: pointer;
+}
+
+.sliderVal {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #181926;
+  min-width: 40px;
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid #FAF7EE;
+}
+
+.toggleText {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggleLabel {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #181926;
+}
+
+.toggleSub {
+  font-size: 0.78rem;
+  color: #6B7280;
+}
+
+.saveBtn {
+  align-self: flex-start;
+  padding: 12px 24px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #F5A623 0%, #E89810 100%);
+  color: #181926;
+  font-size: 0.94rem;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  box-shadow: 0 4px 14px rgba(245, 166, 35, 0.35);
+  transition: all 0.15s ease;
+}
+
+.saveBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(245, 166, 35, 0.45);
+}

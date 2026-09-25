@@ -6,6 +6,18 @@ const nextConfig = {
         source: '/api/:path*',
         destination: 'http://127.0.0.1:8000/api/:path*',
       },
+      {
+        source: '/uploads/:path*',
+        destination: 'http://127.0.0.1:8000/uploads/:path*',
+      },
+      {
+        source: '/results/:path*',
+        destination: 'http://127.0.0.1:8000/results/:path*',
+      },
+      {
+        source: '/dataset/:path*',
+        destination: 'http://127.0.0.1:8000/dataset/:path*',
+      },
     ];
   },
   images: {
