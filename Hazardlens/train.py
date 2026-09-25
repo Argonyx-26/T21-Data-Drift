@@ -1,5 +1,5 @@
 """
-SafeZone AI - Training Script
+Hazardlens - Training Script
 ------------------------------
 Fine-tunes a pretrained YOLOv8 model on the Hard Hat Workers dataset
 (classes: head, helmet, person).

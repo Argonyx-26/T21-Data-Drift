@@ -1,5 +1,5 @@
 """
-SafeZone AI - Restricted Zone Utilities
+Hazardlens - Restricted Zone Utilities
 -----------------------------------------
 Defines the restricted "danger zone" as a polygon on the video frame,
 and provides a helper to check whether a detected person is inside it.

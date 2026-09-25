@@ -1,5 +1,5 @@
 """
-SafeZone AI - Detection Pipeline
+Hazardlens - Detection Pipeline
 ----------------------------------
 Combines two checks on each video frame:
   1. PPE compliance: is a detected head wearing a helmet?

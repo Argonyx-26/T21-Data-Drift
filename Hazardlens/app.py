@@ -1,5 +1,5 @@
 """
-SafeZone AI - Live Dashboard (Polished UI)
+Hazardlens - Live Dashboard (Polished UI)
 ---------------------------------------------
 Streamlit app: upload a video file, see PPE and zone violations flagged
 in real time as it plays, and view a running violation log.
