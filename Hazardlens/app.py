@@ -127,6 +127,9 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+import os
+from zone_utils import ZONE_PRESETS
+
 # ─────────────────────────────────────────────────────────────
 # Sidebar controls
 # ─────────────────────────────────────────────────────────────
@@ -134,6 +137,14 @@ st.markdown("""
 st.sidebar.header("⚙️ Controls")
 uploaded_file  = st.sidebar.file_uploader("Upload a video", type=["mp4", "mov", "avi"])
 conf_threshold = st.sidebar.slider("Detection confidence", 0.1, 0.9, 0.4, 0.05)
+
+zone_preset_name = st.sidebar.selectbox(
+    "📐 Restricted Zone Area",
+    list(ZONE_PRESETS.keys()),
+    index=0,
+)
+selected_zone = ZONE_PRESETS[zone_preset_name]
+
 start_button   = st.sidebar.button("▶  Start monitoring", use_container_width=True)
 stop_button    = st.sidebar.button("⏹  Stop", use_container_width=True)
 
@@ -245,6 +256,7 @@ if st.session_state.running:
             ppe_weights=PPE_WEIGHTS,
             person_weights=PERSON_WEIGHTS,
             conf_threshold=conf_threshold,
+            zone_coords=selected_zone,
         )
     except Exception as e:
         st.error(
@@ -255,12 +267,18 @@ if st.session_state.running:
 
     # ── Load video ─────────────────────────────────────────────
     if uploaded_file is None:
-        st.warning("Please upload a video file in the sidebar first.")
-        st.stop()
-
-    temp_path = "temp_uploaded_video.mp4"
-    with open(temp_path, "wb") as f:
-        f.write(uploaded_file.read())
+        if os.path.exists("temp_uploaded_video.mp4"):
+            temp_path = "temp_uploaded_video.mp4"
+        elif os.path.exists("demo.mp4"):
+            temp_path = "demo.mp4"
+        else:
+            st.warning("Please upload a video file in the sidebar first.")
+            st.stop()
+    else:
+        temp_path = "temp_uploaded_video.mp4"
+        uploaded_file.seek(0)
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.read())
 
     cap = cv2.VideoCapture(temp_path)
 
@@ -283,7 +301,10 @@ if st.session_state.running:
                 "Confidence": f"{v.confidence:.2f}",
                 "Details":    v.details,
             })
-            if v.type == "PPE":
+            if v.type == "INTRUSION":
+                zone_count += 1
+                ppe_count += 1
+            elif v.type == "PPE":
                 ppe_count += 1
             elif v.type == "ZONE":
                 zone_count += 1

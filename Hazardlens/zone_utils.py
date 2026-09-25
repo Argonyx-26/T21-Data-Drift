@@ -42,12 +42,28 @@ from shapely.geometry import Point, Polygon
 #    video/camera setup.
 # ════════════════════════════════════════════════════════════════
 
-RESTRICTED_ZONE = [
-    (0.35, 0.10),    # top-left of zone
-    (0.96, 0.10),    # top-right
-    (0.96, 0.96),    # bottom-right
-    (0.35, 0.96),    # bottom-left
-]
+ZONE_PRESETS = {
+    "Active Work Site (Default)": [
+        (0.08, 0.05),    # top-left of zone
+        (0.92, 0.05),    # top-right
+        (0.92, 0.98),    # bottom-right
+        (0.08, 0.98),    # bottom-left
+    ],
+    "Center & Right Work Area": [
+        (0.30, 0.08),
+        (0.95, 0.08),
+        (0.95, 0.98),
+        (0.30, 0.98),
+    ],
+    "Entire Frame (100% Site)": [
+        (0.01, 0.01),
+        (0.99, 0.01),
+        (0.99, 0.99),
+        (0.01, 0.99),
+    ],
+}
+
+RESTRICTED_ZONE = ZONE_PRESETS["Active Work Site (Default)"]
 
 
 # ════════════════════════════════════════════════════════════════
@@ -63,7 +79,7 @@ def _zone_to_pixels(frame_w, frame_h, zone_norm=None):
     frame_w, frame_h : int
         The video frame dimensions in pixels.
     zone_norm : list of (float, float), optional
-        Normalized polygon vertices.  Defaults to RESTRICTED_ZONE.
+        Normalized polygon vertices. Defaults to RESTRICTED_ZONE.
 
     Returns
     -------
@@ -82,12 +98,11 @@ def is_inside_zone(point, frame_w, frame_h, zone_norm=None):
     Parameters
     ----------
     point : tuple (x, y)
-        Pixel coordinates — typically the bottom-center of a person's
-        bounding box (approximate foot position).
+        Pixel coordinates.
     frame_w, frame_h : int
-        Video frame dimensions (needed to scale the zone).
+        Video frame dimensions.
     zone_norm : list of (float, float), optional
-        Normalized polygon vertices.  Defaults to RESTRICTED_ZONE.
+        Normalized polygon vertices. Defaults to RESTRICTED_ZONE.
 
     Returns
     -------
@@ -96,9 +111,54 @@ def is_inside_zone(point, frame_w, frame_h, zone_norm=None):
     if zone_norm is None:
         zone_norm = RESTRICTED_ZONE
     if len(zone_norm) < 3:
-        return False  # not a valid polygon
+        return False
     zone_px = _zone_to_pixels(frame_w, frame_h, zone_norm)
     return Polygon(zone_px).contains(Point(point))
+
+
+def is_person_in_zone(box, frame_w, frame_h, zone_norm=None):
+    """
+    Check whether a person's bounding box is inside (or intersects) the restricted zone.
+
+    Performs multi-point validation:
+      1. Bottom-center (feet position)
+      2. Geometric center of person
+      3. Bounding box intersection with zone polygon (>15% overlap)
+
+    This ensures reliable detection even when feet are cut off by the camera edge,
+    scaffolding, or waist-up framing.
+    """
+    if zone_norm is None:
+        zone_norm = RESTRICTED_ZONE
+    if len(zone_norm) < 3:
+        return False
+
+    zone_px = _zone_to_pixels(frame_w, frame_h, zone_norm)
+    poly = Polygon(zone_px)
+    x1, y1, x2, y2 = box
+
+    # 1. Check foot position
+    foot = Point((x1 + x2) / 2, y2)
+    if poly.contains(foot):
+        return True
+
+    # 2. Check box center
+    center = Point((x1 + x2) / 2, (y1 + y2) / 2)
+    if poly.contains(center):
+        return True
+
+    # 3. Check bounding box intersection
+    box_poly = Polygon([(x1, y1), (x2, y1), (x2, y2), (x1, y2)])
+    if poly.intersects(box_poly):
+        try:
+            inter_area = poly.intersection(box_poly).area
+            box_area = max(1.0, (x2 - x1) * (y2 - y1))
+            if (inter_area / box_area) > 0.15:
+                return True
+        except Exception:
+            return True
+
+    return False
 
 
 def bbox_bottom_center(box):
@@ -111,24 +171,12 @@ def bbox_bottom_center(box):
     return ((x1 + x2) / 2, y2)
 
 
-def draw_zone(frame, zone_norm=None, color=(0, 165, 255)):
+def draw_zone(frame, zone_norm=None, color=(0, 165, 255), alert=False):
     """
     Draw a semi-transparent restricted-zone polygon on the frame.
+    Scales automatically to any frame resolution.
 
-    The zone is automatically scaled to match the frame's resolution.
-
-    Parameters
-    ----------
-    frame : ndarray
-        The video frame (modified in-place and returned).
-    zone_norm : list of (float, float), optional
-        Normalized polygon vertices.  Defaults to RESTRICTED_ZONE.
-    color : tuple
-        BGR colour for the zone outline and fill.
-
-    Returns
-    -------
-    frame : ndarray
+    If alert=True, border turns red to highlight an active intrusion.
     """
     if zone_norm is None:
         zone_norm = RESTRICTED_ZONE
@@ -137,24 +185,33 @@ def draw_zone(frame, zone_norm=None, color=(0, 165, 255)):
 
     h, w = frame.shape[:2]
     zone_px = _zone_to_pixels(w, h, zone_norm)
-
     pts = np.array(zone_px, dtype=np.int32).reshape((-1, 1, 2))
 
+    draw_color = (0, 0, 255) if alert else color
+    thickness = 3 if alert else 2
+
     # Outline
-    cv2.polylines(frame, [pts], isClosed=True, color=color, thickness=2)
+    cv2.polylines(frame, [pts], isClosed=True, color=draw_color, thickness=thickness)
 
-    # Semi-transparent fill (15% opacity)
+    # Semi-transparent fill
     overlay = frame.copy()
-    cv2.fillPoly(overlay, [pts], color)
-    cv2.addWeighted(overlay, 0.15, frame, 0.85, 0, frame)
+    cv2.fillPoly(overlay, [pts], draw_color)
+    opacity = 0.20 if alert else 0.12
+    cv2.addWeighted(overlay, opacity, frame, 1.0 - opacity, 0, frame)
 
-    # Label
-    cx = int(np.mean([p[0] for p in zone_px]))
-    cy = int(np.mean([p[1] for p in zone_px]))
+    # Label on top-left of zone
+    min_x = min(p[0] for p in zone_px)
+    min_y = min(p[1] for p in zone_px)
+    label_text = "RESTRICTED ZONE [INTRUSION]" if alert else "RESTRICTED SITE ZONE"
+    
     cv2.putText(
-        frame, "RESTRICTED ZONE",
-        (cx - 120, cy),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2,
+        frame,
+        label_text,
+        (min_x + 10, max(min_y + 25, 30)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        draw_color,
+        2,
     )
 
     return frame
