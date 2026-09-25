@@ -1,4 +1,4 @@
-# SafeZone AI
+# HazardLens
 
 Real-time workplace safety monitoring: upload a video, and the system
 detects **missing helmets (PPE non-compliance)** and **restricted-zone
@@ -11,23 +11,23 @@ No webcam/live camera support — this works purely on uploaded video files.
 
 ## 📁 File Structure
 
-```
-SafeZoneAI/
+```text
+HazardLens/
 ├── train.py           # Fine-tunes YOLOv8 on the Hard Hat Workers dataset
-├── detector.py         # Core detection pipeline: PPE check + zone check
-├── zone_utils.py        # Restricted-zone polygon logic + calibration tool
+├── detector.py        # Core detection pipeline: PPE check + zone check
+├── zone_utils.py      # Restricted-zone polygon logic + calibration tool
 ├── app.py             # Streamlit dashboard (upload video, see results)
-├── requirements.txt      # All Python dependencies (free/open source)
-├── .gitignore          # Excludes dataset, venv, cache files from git
-├── README.md           # This file
+├── requirements.txt   # All Python dependencies (free/open source)
+├── .gitignore         # Excludes dataset, venv, cache files from git
+├── README.md          # This file
 │
-├── dataset/            # (You add this) Downloaded Hard Hat Workers dataset
+├── dataset/           # (You add this) Downloaded Hard Hat Workers dataset
 │   ├── data.yaml
 │   ├── train/
 │   ├── valid/
 │   └── test/
 │
-└── best.pt             # (Generated after training) Your trained model weights
+└── best.pt            # (Generated after training) Your trained model weights
 ```
 
 ---
@@ -76,8 +76,9 @@ find . -name "best.pt"
 ```
 
 Copy the newest one into the project root:
+
 ```bash
-cp ./runs/detect/runs/safezone_ai*/weights/best.pt ./best.pt
+cp ./runs/detect/runs/HazardLens*/weights/best.pt ./best.pt
 ```
 
 ### Step 5: Get a demo video
@@ -108,6 +109,7 @@ streamlit run app.py
 ```
 
 This opens a browser tab automatically (usually `localhost:8501`). In the dashboard:
+
 1. Use the sidebar to **upload your demo video**
 2. Adjust the confidence slider if needed (default 0.4 is a good starting point)
 3. Click **"▶ Start monitoring"**
@@ -127,20 +129,21 @@ This opens a browser tab automatically (usually `localhost:8501`). In the dashbo
 3. Click **"New app"**, select your repo, set the main file to `app.py`
 4. Click **Deploy**
 
-**Note on `best.pt`**: check its size with `ls -lh best.pt`. If under ~90MB,
-commit it directly to git so it deploys with the app. If larger, you'll
-need Git LFS or a download-at-startup approach (ask for this code if needed).
+**Note on `best.pt`**: check its size with:
+
+```bash
+ls -lh best.pt
+```
+
+If under ~90MB, commit it directly to git so it deploys with the app. If larger, you'll need Git LFS or a download-at-startup approach.
 
 ---
 
 ## 🔧 Tuning Tips
 
-- **Too many false "NO HELMET" flags?** Raise the confidence slider, or
-  increase the IOU overlap threshold in `detector.py` (`> 0.2` → try `> 0.3`)
-- **Low training accuracy?** Try `yolov8s.pt` instead of `yolov8n.pt` in
-  `train.py` (slower but more accurate), or train for more epochs
-- **Video processing feels slow?** Lower the video resolution before
-  uploading, or reduce `imgsz` in `detector.py`'s model call
+- **Too many false "NO HELMET" flags?** Raise the confidence slider, or increase the IOU overlap threshold in `detector.py` (`> 0.2` → try `> 0.3`)
+- **Low training accuracy?** Try `yolov8s.pt` instead of `yolov8n.pt` in `train.py` (slower but more accurate), or train for more epochs
+- **Video processing feels slow?** Lower the video resolution before uploading, or reduce `imgsz` in `detector.py`'s model call
 
 ---
 
