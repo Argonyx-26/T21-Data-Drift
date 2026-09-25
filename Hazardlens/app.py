@@ -13,11 +13,19 @@ BEFORE RUNNING:
 """
 
 import time
+import os
+import importlib
 import cv2
 import pandas as pd
 import streamlit as st
 
+import detector
+import zone_utils
+importlib.reload(detector)
+importlib.reload(zone_utils)
+
 from detector import SafeZoneDetector
+from zone_utils import ZONE_PRESETS
 
 PPE_WEIGHTS    = "best.pt"
 PERSON_WEIGHTS = "yolov8n.pt"

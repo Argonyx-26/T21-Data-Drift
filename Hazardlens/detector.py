@@ -6,14 +6,11 @@ Architecture:
     1. Custom model  (best.pt)    → head + helmet detection
     2. Pretrained    (yolov8n.pt) → person detection
 
-Intrusion logic:
-    - Person inside the site WITHOUT a helmet = INTRUSION (Critical safety hazard)
-    - Person inside the site WITH a helmet    = AUTHORIZED / SAFE
-    - Person outside the site WITHOUT a helmet = PPE VIOLATION
-
-Violation counting:
-    Violations are counted as distinct EVENTS using ByteTrack tracking + cooldown.
-    A worker in the site for 200 frames triggers 1 intrusion event, not 200.
+Core Intrusion Rule:
+    - Person inside restricted area WITHOUT PPE (helmet) = INTRUSION (and PPE Violation)
+    - Person inside restricted area WITH PPE (helmet)    = NO INTRUSION (Authorized, Safe)
+    - Person outside restricted area WITHOUT PPE (helmet) = PPE VIOLATION
+    - Person outside restricted area WITH PPE (helmet)    = Normal (Safe)
 """
 
 import time
@@ -36,9 +33,9 @@ from zone_utils import (
 # ============================================================
 
 COLOR_SAFE           = (0, 200, 0)       # Green  — helmet present, allowed
-COLOR_INTRUSION      = (0, 0, 255)       # Red    — intrusion (no helmet in zone)
+COLOR_INTRUSION      = (0, 0, 255)       # Red    — intrusion / no helmet in zone
 COLOR_PERSON_OUTSIDE = (255, 200, 0)     # Cyan   — person outside zone
-COLOR_NO_HELMET      = (0, 80, 255)      # Dark orange — no helmet outside zone
+COLOR_NO_HELMET      = (0, 80, 255)      # Dark orange/red — no helmet
 
 _COOLDOWN_FRAMES = 30   # ~1 second at 30 fps
 
@@ -50,7 +47,7 @@ _COOLDOWN_FRAMES = 30   # ~1 second at 30 fps
 @dataclass
 class Violation:
     """One discrete violation event."""
-    type: str                    # "INTRUSION", "PPE", or "ZONE"
+    type: str                    # "INTRUSION" or "PPE"
     timestamp: float             # Unix timestamp when first detected
     confidence: float            # Detection confidence at event start
     details: str = ""
@@ -64,9 +61,7 @@ class Violation:
 class SafeZoneDetector:
     """
     Dual-model detector for workplace safety monitoring.
-
-    Combines person detection with head/helmet PPE classification.
-    Person inside site without helmet = INTRUSION.
+    Only flags an intrusion if a person enters the restricted zone WITHOUT PPE.
     """
 
     def __init__(
@@ -76,18 +71,6 @@ class SafeZoneDetector:
         conf_threshold: float = 0.4,
         zone_coords: Optional[list] = None,
     ):
-        """
-        Parameters
-        ----------
-        ppe_weights : str
-            Path to the custom YOLO model trained on head/helmet.
-        person_weights : str
-            Path to a pretrained YOLO model for person detection.
-        conf_threshold : float
-            Minimum detection confidence (applied to both models).
-        zone_coords : list of (float, float), optional
-            Normalized restricted zone polygon vertices.
-        """
         # ── Custom model: head + helmet ────────────────────────
         self.ppe_model = YOLO(ppe_weights)
         self.ppe_class_names = self.ppe_model.names
@@ -131,17 +114,21 @@ class SafeZoneDetector:
         # 1. Run BOTH models on the clean frame
         # ────────────────────────────────────────────────────────
 
+        # Sensitive threshold for PPE so helmets are not discarded when user increases slider
+        ppe_conf_thresh = max(0.20, min(0.35, self.conf_threshold))
         ppe_results = self.ppe_model.track(
             frame,
-            conf=self.conf_threshold,
+            conf=ppe_conf_thresh,
             persist=True,
             tracker="bytetrack.yaml",
             verbose=False,
         )[0]
 
+        # Use an adaptive high-recall threshold (0.25) for person detection
+        person_conf_thresh = max(0.20, min(0.25, self.conf_threshold))
         person_results = self.person_model.track(
             frame,
-            conf=self.conf_threshold,
+            conf=person_conf_thresh,
             classes=[0],
             persist=True,
             tracker="bytetrack.yaml",
@@ -149,11 +136,12 @@ class SafeZoneDetector:
         )[0]
 
         # ────────────────────────────────────────────────────────
-        # 2. Collect head and helmet detections
+        # 2. Collect head, helmet, and model-detected persons
         # ────────────────────────────────────────────────────────
 
         heads = []    # [(coords, conf, track_id), ...]
         helmets = []
+        candidate_persons = []  # [(coords, conf, track_id, source), ...]
 
         for box in ppe_results.boxes:
             cls_id     = int(box.cls[0])
@@ -166,49 +154,67 @@ class SafeZoneDetector:
                 heads.append((coords, confidence, track_id))
             elif cls_name == "helmet":
                 helmets.append((coords, confidence, track_id))
+            elif cls_name == "person" and confidence >= person_conf_thresh:
+                candidate_persons.append((coords, confidence, track_id, "ppe_model"))
+
+        # Add person detections from pretrained COCO model
+        for box in person_results.boxes:
+            if int(box.cls[0]) == 0:
+                coords = box.xyxy[0].tolist()
+                conf   = float(box.conf[0])
+                tid    = int(box.id[0]) if box.id is not None else None
+                candidate_persons.append((coords, conf, tid, "coco_model"))
 
         # ────────────────────────────────────────────────────────
-        # 3. Check persons against Zone and PPE
+        # 3. High-Recall Recovery: Infer Person from Head/Helmet
+        # ────────────────────────────────────────────────────────
+        all_headwear = heads + helmets
+        for h_coords, h_conf, _ in all_headwear:
+            hx1, hy1, hx2, hy2 = h_coords
+            hc_x = (hx1 + hx2) / 2
+            hc_y = (hy1 + hy2) / 2
+
+            has_body = any(
+                (p[0][0] <= hc_x <= p[0][2] and p[0][1] <= hc_y <= p[0][3])
+                for p in candidate_persons
+            )
+
+            if not has_body:
+                hw = max(10.0, hx2 - hx1)
+                hh = max(10.0, hy2 - hy1)
+                px1 = max(0, hc_x - hw * 1.25)
+                px2 = min(frame_w, hc_x + hw * 1.25)
+                py1 = max(0, hy1 - hh * 0.15)
+                py2 = min(frame_h, hy1 + hh * 4.8)
+                candidate_persons.append(([px1, py1, px2, py2], h_conf, None, "head_proxy"))
+
+        # NMS deduplication to merge overlapping person candidates
+        final_persons = self._nms_boxes(candidate_persons, iou_thresh=0.35)
+
+        # ────────────────────────────────────────────────────────
+        # 4. Check persons against Zone and PPE
         # ────────────────────────────────────────────────────────
 
         intrusion_this_frame = set()
         ppe_this_frame = set()
         active_intrusion = False
 
-        # Sort persons by area (larger = closer, process first)
-        person_boxes = sorted(
-            person_results.boxes,
-            key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1]),
-            reverse=True,
-        )
-
-        for box in person_boxes:
-            cls_id = int(box.cls[0])
-            if cls_id != 0:
-                continue
-
-            confidence = float(box.conf[0])
-            coords     = box.xyxy[0].tolist()
-            track_id   = int(box.id[0]) if box.id is not None else None
-
-            # Fallback tracking ID based on spatial cell if tracker drops id
+        for coords, confidence, track_id, source in final_persons:
             effective_id = track_id
             if effective_id is None:
                 cx = int((coords[0] + coords[2]) / 2 / 120)
                 cy = int((coords[1] + coords[3]) / 2 / 120)
                 effective_id = f"cell_{cx}_{cy}"
 
-            # Zone & PPE checks
             inside_zone = is_person_in_zone(coords, frame_w, frame_h, self.zone_coords)
-            has_helmet = self._person_has_helmet(coords, helmets)
+            has_helmet = self._person_has_helmet(coords, heads, helmets)
 
-            # ── Determine status ───────────────────────────────
+            # ── Intrusion & PPE Rule ───────────────────────────
+            # Rule: ONLY person in restricted zone WITHOUT PPE = INTRUSION
+            # If wearing PPE inside zone = ALLOWED (NO INTRUSION)
             if inside_zone and not has_helmet:
-                # ⚠ CRITICAL INTRUSION: inside site without helmet
+                # 🚨 INTRUSION: Inside restricted area WITHOUT PPE
                 active_intrusion = True
-                color = COLOR_INTRUSION
-                label = "INTRUSION: NO HELMET"
-
                 intrusion_this_frame.add(effective_id)
                 self._intrusion_clean.pop(effective_id, None)
 
@@ -219,21 +225,21 @@ class SafeZoneDetector:
                             type="INTRUSION",
                             timestamp=time.time(),
                             confidence=confidence,
-                            details="Worker in restricted site without helmet",
+                            details="Worker entered restricted zone without helmet",
                             track_id=track_id,
                         )
                     )
 
+                color = COLOR_INTRUSION
+                label = "🚨 INTRUSION: NO HELMET"
+
             elif inside_zone and has_helmet:
-                # ✓ Inside site WITH helmet — authorized
+                # ✓ Person in restricted area WITH PPE = NO INTRUSION (ALLOWED)
                 color = COLOR_SAFE
-                label = "AUTHORIZED (HELMET OK)"
+                label = "✓ AUTHORIZED (HELMET OK)"
 
             elif not inside_zone and not has_helmet:
-                # Outside site without helmet — PPE violation
-                color = COLOR_NO_HELMET
-                label = "NO HELMET"
-
+                # ⚠ Outside restricted area WITHOUT PPE = PPE VIOLATION
                 ppe_this_frame.add(effective_id)
                 self._ppe_clean.pop(effective_id, None)
 
@@ -249,35 +255,48 @@ class SafeZoneDetector:
                         )
                     )
 
+                color = COLOR_NO_HELMET
+                label = "⚠ NO HELMET"
+
             else:
-                # Outside site with helmet — normal
-                color = COLOR_PERSON_OUTSIDE
-                label = "Person"
+                # Outside restricted area WITH PPE = NORMAL
+                color = COLOR_SAFE
+                label = "Person (Helmet OK)"
 
             self._draw_box(frame, coords, color, label, confidence)
 
         # ────────────────────────────────────────────────────────
-        # 4. Draw restricted-zone overlay (alerts if intrusion)
+        # 5. Draw restricted-zone overlay (alerts only if unauthorized intrusion)
         # ────────────────────────────────────────────────────────
 
         frame = draw_zone(frame, zone_norm=self.zone_coords, alert=active_intrusion)
 
         # ────────────────────────────────────────────────────────
-        # 5. Draw head and helmet bounding boxes for clarity
+        # 6. Draw head/helmet tags with mutual suppression on same head
         # ────────────────────────────────────────────────────────
 
+        drawn_helmets = set()
         for head_box, conf, _ in heads:
-            helmet_on = any(self._iou(head_box, hb) > 0.15 for hb, _, _ in helmets)
-            if helmet_on:
-                self._draw_box(frame, head_box, COLOR_SAFE, "Helmet OK", conf, small=True)
+            matching_helmets = [
+                (i, hb, hconf) for i, (hb, hconf, _) in enumerate(helmets)
+                if self._iou(head_box, hb) > 0.20
+            ]
+            if matching_helmets:
+                best_match = max(matching_helmets, key=lambda x: x[2])
+                drawn_helmets.add(best_match[0])
+                if best_match[2] > (conf + 0.10):
+                    self._draw_box(frame, best_match[1], COLOR_SAFE, "Helmet OK", best_match[2], small=True)
+                else:
+                    self._draw_box(frame, head_box, COLOR_INTRUSION, "NO HELMET", conf, small=True)
             else:
                 self._draw_box(frame, head_box, COLOR_INTRUSION, "NO HELMET", conf, small=True)
 
-        for helmet_box, conf, _ in helmets:
-            self._draw_box(frame, helmet_box, COLOR_SAFE, "Helmet", conf, small=True)
+        for i, (helmet_box, conf, _) in enumerate(helmets):
+            if i not in drawn_helmets:
+                self._draw_box(frame, helmet_box, COLOR_SAFE, "Helmet", conf, small=True)
 
         # ────────────────────────────────────────────────────────
-        # 6. Cooldown management for deduplication
+        # 7. Cooldown management for deduplication
         # ────────────────────────────────────────────────────────
 
         for tid in list(self._intrusion_seen):
@@ -304,30 +323,64 @@ class SafeZoneDetector:
     # HELMET OVERLAP CHECK
     # ============================================================
 
-    def _person_has_helmet(self, person_box, helmets):
+    def _person_has_helmet(self, person_box, heads, helmets):
         """
-        Check if any detected helmet corresponds to this person.
-        Checks both upper 40% head-zone and overall containment.
+        Determine if this person has compliant PPE (certified helmet).
+        Disambiguates between baseball caps/hair and hardhats.
         """
         px1, py1, px2, py2 = person_box
-        person_h = max(1.0, py2 - py1)
+        pw = max(1.0, px2 - px1)
+        ph = max(1.0, py2 - py1)
+        # Expand head region upward by 10% and laterally by 10% (helmets sit atop the head)
+        head_region = (px1 - pw * 0.10, py1 - ph * 0.10, px2 + pw * 0.10, py1 + ph * 0.45)
 
-        head_region = (px1, py1, px2, py1 + person_h * 0.40)
+        p_helmets = [
+            h for h in helmets
+            if self._iou(head_region, h[0]) > 0.05 or
+            (px1 <= (h[0][0] + h[0][2]) / 2 <= px2 and py1 <= (h[0][1] + h[0][3]) / 2 <= py1 + ph * 0.45)
+        ]
 
-        for helmet_box, _, _ in helmets:
-            # Direct IOU with upper body region
-            if self._iou(head_region, helmet_box) > 0.02:
-                return True
-            # Center of helmet is in upper half of person box
-            hx_c = (helmet_box[0] + helmet_box[2]) / 2
-            hy_c = (helmet_box[1] + helmet_box[3]) / 2
-            if px1 <= hx_c <= px2 and py1 <= hy_c <= (py1 + person_h * 0.50):
-                return True
-            # Full person box contains helmet center
-            if self._box_contains(person_box, helmet_box):
-                return True
+        p_heads = [
+            h for h in heads
+            if self._iou(head_region, h[0]) > 0.05 or
+            (px1 <= (h[0][0] + h[0][2]) / 2 <= px2 and py1 <= (h[0][1] + h[0][3]) / 2 <= py1 + ph * 0.45)
+        ]
 
-        return False
+        if not p_helmets and not p_heads:
+            return False
+
+        if p_heads and not p_helmets:
+            return False
+
+        if p_helmets and not p_heads:
+            return True
+
+        # When model predicts both on the same person (e.g. baseball cap):
+        # Declare compliant ONLY if helmet confidence significantly exceeds head confidence
+        max_helm_conf = max(h[1] for h in p_helmets)
+        max_head_conf = max(h[1] for h in p_heads)
+        return max_helm_conf > (max_head_conf + 0.10)
+
+    @classmethod
+    def _nms_boxes(cls, candidates, iou_thresh=0.35):
+        """
+        Non-maximum suppression to merge overlapping person candidate boxes.
+        Prioritizes direct model detections over synthetic head proxies.
+        """
+        if not candidates:
+            return []
+
+        def sort_key(c):
+            type_weight = 1.0 if c[3] != "head_proxy" else 0.5
+            return (type_weight, c[1])
+
+        candidates = sorted(candidates, key=sort_key, reverse=True)
+        keep = []
+        for cand in candidates:
+            box = cand[0]
+            if not any(cls._iou(box, k[0]) > iou_thresh for k in keep):
+                keep.append(cand)
+        return keep
 
     @staticmethod
     def _box_contains(outer, inner):
